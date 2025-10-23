@@ -114,7 +114,7 @@
         "jest-environment-jsdom": "^30.0.5",
         "jest-extended": "^6.0.0",
         "mini-css-extract-plugin": "^2.9.4",
-        "monaco-editor-webpack-plugin": "^7.0.1",
+        "monaco-editor-webpack-plugin": "^7.1.1",
         "null-loader": "^4.0.1",
         "patch-package": "^8.0.1",
         "sass": "^1.89.2",
