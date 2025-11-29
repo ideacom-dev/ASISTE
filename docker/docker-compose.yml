@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  glpi:
+    image: ideacom/asiste-glpi:latest
+    container_name: asiste-glpi
+    ports:
+      - "8080:80"
+    volumes:
+      - glpi_data:/var/www/html
+    restart: always
+
+volumes:
+  glpi_data:
