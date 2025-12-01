@@ -39,10 +39,12 @@ use CommonDBTM;
 use Gettext\Languages\Language;
 use Glpi\Form\FormTranslation;
 use Glpi\ItemTranslation\Context\ProvideTranslationsInterface;
+use Glpi\ItemTranslation\Context\TranslationHandler;
 use LogicException;
 use Override;
 use Session;
 
+use function Safe\array_walk_recursive;
 use function Safe\json_decode;
 use function Safe\json_encode;
 
@@ -109,6 +111,9 @@ abstract class ItemTranslation extends CommonDBChild
 
         // retrieve the formulas associated to the language
         $gettext_language = Language::getById($this->fields['language']);
+        if ($gettext_language === null) {
+            return null;
+        }
 
         // compute the formula with the paramater count
         $formula_to_compute = str_replace('n', (string) $count, $gettext_language->formula);
@@ -215,7 +220,18 @@ abstract class ItemTranslation extends CommonDBChild
             throw new LogicException('Item does not provide translations');
         }
 
-        return $item->listTranslationsHandlers();
+        // Filter out handlers with empty values and those that do not have a translation yet
+        return array_map(
+            fn(array $handlers) => array_filter(
+                $handlers,
+                fn(TranslationHandler $handler) => !empty($handler->getValue()) || !empty(self::getForItemKeyAndLanguage(
+                    $item,
+                    $handler->getKey(),
+                    $this->fields['language']
+                )?->getTranslation())
+            ),
+            $item->listTranslationsHandlers()
+        );
     }
 
     public function getTranslatedPercentage(): int
@@ -278,7 +294,7 @@ abstract class ItemTranslation extends CommonDBChild
                         static::$itemtype => $handler->getItem()->getType(),
                         'language'        => $this->fields['language'],
                         'key'             => $handler->getKey(),
-                        'hash'            => ['!=', md5($handler->getValue())],
+                        'hash'            => ['!=', md5($handler->getValue() ?? '')],
                     ])
                 ) {
                     if ($translation->isPossiblyObsolete()) {

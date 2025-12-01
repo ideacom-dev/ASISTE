@@ -498,15 +498,11 @@ class Auth extends CommonGLPI
 
                 // Update password if needed
                 if (self::needRehash($password_db)) {
-                    $input = [
-                        'id' => $row['id'],
-                    ];
-                    // Set glpiID to allow password update
-                    $_SESSION['glpiID'] = $input['id'];
-                    $input['password'] = $password;
-                    $input['password2'] = $password;
-                    $user = new User();
-                    $user->update($input);
+                    $DB->update(
+                        User::getTable(),
+                        ['password' => password_hash($password, PASSWORD_DEFAULT)],
+                        ['id' => $row['id']]
+                    );
                 }
                 $this->user->getFromDBByCrit(['id' => $row['id']]);
                 $this->extauth                  = 0;
@@ -909,7 +905,7 @@ class Auth extends CommonGLPI
                 ) {
                     // Case of using external auth and no LDAP servers, so get data from external auth
                     $this->user->getFromSSO();
-                    $this->user_present = $this->user->getFromDBbyName($this->user->fields['name']);
+                    $this->user_present = !$this->user->isNewItem();
                 } else {
                     if ($this->user->fields['authtype'] === self::LDAP) {
                         if (!$ldapservers_status) {

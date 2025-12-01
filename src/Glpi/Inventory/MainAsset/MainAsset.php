@@ -100,7 +100,7 @@ abstract class MainAsset extends InventoryAsset
     protected $partial = false;
     /** @var bool */
     protected bool $is_discovery = false;
-
+    /** @var int */
     protected $current_key;
 
     public function __construct(CommonDBTM $item, $data)
@@ -345,7 +345,7 @@ abstract class MainAsset extends InventoryAsset
                     if (property_exists($val, 'contact')) {
                         if ($val->contact == '') {
                             $val->contact = $user;
-                        } else {
+                        } elseif (mb_strlen($val->contact . '/' . $user) <= 255) {
                             $val->contact .= "/" . $user;
                         }
                     } else {
@@ -364,6 +364,11 @@ abstract class MainAsset extends InventoryAsset
         }
     }
 
+    /**
+     * @param stdClass $val
+     *
+     * @return void
+     */
     protected function prepareForBios($val)
     {
         $bios = (object) $this->extra_data['bios'];
@@ -625,6 +630,11 @@ abstract class MainAsset extends InventoryAsset
         }
     }
 
+    /**
+     * @param array $input
+     *
+     * @return void
+     */
     protected function addRefused(array $input)
     {
         $refused_input = [
@@ -681,6 +691,8 @@ abstract class MainAsset extends InventoryAsset
      * @param string        $itemtype Item type
      * @param int|null      $rules_id Matched rule id, if any (else null)
      * @param integer|array $ports_id Matched port id, if any
+     *
+     * @return void
      */
     public function rulepassed($items_id, $itemtype, $rules_id, $ports_id = [])
     {
@@ -886,12 +898,18 @@ abstract class MainAsset extends InventoryAsset
             ) {
                 //only update autoupdatesystems_id, last_inventory_update, snmpcredentials_id
                 $input = $this->handleInput($val, $this->item);
-                $this->item->update(['id' => $input['id'],
+
+                $update_data = [
+                    'id'                    => $input['id'],
                     'autoupdatesystems_id'  => $input['autoupdatesystems_id'],
                     'last_inventory_update' => $input['last_inventory_update'],
-                    'snmpcredentials_id'    => $input['snmpcredentials_id'],
                     'is_dynamic'            => true,
-                ]);
+                ];
+                if (isset($input['snmpcredentials_id'])) {
+                    $update_data['snmpcredentials_id'] = $input['snmpcredentials_id'];
+                }
+                $this->item->update($update_data);
+
                 //add rule matched log
                 $rulesmatched = new RuleMatchedLog();
                 $inputrulelog = [
@@ -1011,6 +1029,9 @@ abstract class MainAsset extends InventoryAsset
         return $this->is_recursive;
     }
 
+    /**
+     * @return void
+     */
     public function handleAssets()
     {
         $key = $this->current_key;
@@ -1129,6 +1150,8 @@ abstract class MainAsset extends InventoryAsset
 
     /**
      * Is an access point
+     *
+     * @param stdClass $object
      *
      * @return boolean
      */

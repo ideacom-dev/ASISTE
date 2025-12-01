@@ -558,7 +558,7 @@ TWIG, $twig_params);
      */
     public function embed(array $params)
     {
-        Toolbox::deprecated(version: '11.1.0');
+        Toolbox::deprecated(version: '12.0.0');
 
         // show embedded dashboard
         $this->initEmbed($params);
@@ -988,10 +988,13 @@ HTML;
             $cache_age = 40;
 
             if ($use_cache) {
-                // browser cache
+                // remove headers automatically added by session start
                 header_remove('Pragma');
-                header('Cache-Control: public');
-                header('Cache-Control: max-age=' . $cache_age);
+                header_remove('Cache-Control');
+                header_remove('Expires');
+
+                // add cache headers
+                header('Cache-Control: public, max-age=' . $cache_age . ', must-revalidate');
                 header('Expires: ' . gmdate('D, d M Y H:i:s \G\M\T', time() + $cache_age));
             }
 
@@ -1499,7 +1502,7 @@ HTML;
         global $CFG_GLPI;
         $new_key = "";
         $target = Toolbox::cleanTarget($_REQUEST['_target'] ?? $_SERVER['REQUEST_URI'] ?? "");
-        if (isset($_SESSION['last_dashboards']) && strlen($target) > 0) {
+        if (isset($_SESSION['last_dashboards']) && $target !== '') {
             $target = preg_replace('/^' . preg_quote($CFG_GLPI['root_doc'], '/') . '/', '', $target);
             if (!isset($_SESSION['last_dashboards'][$target])) {
                 return "";
@@ -1537,7 +1540,7 @@ HTML;
 
         if (!$strict) {
             $restored = $grid->restoreLastDashboard();
-            if (strlen($restored) > 0) {
+            if ($restored !== '') {
                 return $restored;
             }
         }

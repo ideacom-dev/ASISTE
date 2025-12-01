@@ -2959,6 +2959,101 @@ describe ('Conditions', () => {
         cy.findByRole('dialog', {'name': 'Question has conditions and its type cannot be changed'}).should('not.exist');
     });
 
+    it("can't delete a section, question or comment used in submit button conditions", () => {
+        createForm();
+        addQuestion('My first question');
+        addSection('My section');
+        addComment('My first comment');
+
+        getSubmitButtonContainer().within(() => {
+            openConditionEditor();
+            checkThatConditionEditorIsNotDisplayed();
+            setConditionStrategy('Visible if...');
+            checkThatConditionEditorIsDisplayed();
+            fillCondition(0, null, 'My first question', 'Is equal to', 'Expected answer 1');
+            addNewEmptyCondition();
+            fillCondition(1, null, 'My section', 'Is visible', null, null);
+            addNewEmptyCondition();
+            fillCondition(2, null, 'My first comment', 'Is visible', null, null);
+        });
+
+        saveAndReload();
+
+        // Delete the first question
+        getAndFocusQuestion('My first question').within(() => {
+            cy.findByRole('button', {'name': 'Delete'}).click();
+        });
+        cy.findByRole('dialog', {'name': 'Item has conditions and cannot be deleted'})
+            .should('have.attr', 'data-cy-shown', 'true')
+            .within(() => {
+                cy.findByRole('link', {'name': 'Submit button visibility'}).should('be.visible');
+                cy.findByRole('button', {'name': 'Close'}).click();
+            });
+
+        // Delete the section
+        getAndFocusSection('My section').within(() => {
+            cy.findByRole('button', {'name': 'More actions'}).click();
+            cy.findByRole('button', {'name': 'Delete section'}).click();
+        });
+        cy.findByRole('dialog', {'name': 'Item has conditions and cannot be deleted'})
+            .should('have.attr', 'data-cy-shown', 'true')
+            .within(() => {
+                cy.findByRole('link', {'name': 'Submit button visibility'}).should('be.visible');
+                cy.findByRole('button', {'name': 'Close'}).click();
+            });
+
+        // Delete the comment
+        getAndFocusComment('My first comment').within(() => {
+            cy.findByRole('button', {'name': 'Delete'}).click();
+        });
+        cy.findByRole('dialog', {'name': 'Item has conditions and cannot be deleted'})
+            .should('have.attr', 'data-cy-shown', 'true')
+            .within(() => {
+                cy.findByRole('link', {'name': 'Submit button visibility'}).should('be.visible');
+                cy.findByRole('button', {'name': 'Close'}).click();
+            });
+    });
+
+    it("can't change the type of a question used in submit button conditions with unsupported value operators", () => {
+        createForm();
+        addQuestion('My first question');
+        addQuestion('My second question');
+
+        getAndFocusQuestion('My first question').changeQuestionType('Urgency');
+
+        getSubmitButtonContainer().within(() => {
+            openConditionEditor();
+            setConditionStrategy('Visible if...');
+            fillCondition(0, null, 'My first question', 'Is greater than', 'High', 'dropdown');
+            addNewEmptyCondition();
+            fillCondition(1, null, 'My second question', 'Is equal to', 'Expected answer 2');
+        });
+        saveAndReload();
+
+        // Change the type of the first question to a type that doesn't support "Is greater than" operator
+        getAndFocusQuestion('My first question').changeQuestionType('Short answer');
+        cy.findByRole('dialog', {'name': 'Question has conditions and its type cannot be changed'})
+            .should('have.attr', 'data-cy-shown', 'true')
+            .within(() => {
+                cy.findByRole('link', {'name': 'Submit button visibility'}).should('be.visible');
+                cy.findByRole('button', {'name': 'Close'}).click();
+            });
+
+        // Change the type of the second question to a type that supports the operator used
+        getAndFocusQuestion('My second question').changeQuestionType('Long answer');
+        cy.findByRole('dialog', {'name': 'Question has conditions and its type cannot be changed'}).should('not.exist');
+
+        // Delete conditions
+        getSubmitButtonContainer().within(() => {
+            openConditionEditor();
+            deleteCondition(0);
+        });
+
+        // Change the type of the first question to a type that doesn't support "Is greater than" operator
+        getAndFocusQuestion('My first question').changeQuestionType('Short answer');
+        cy.findByRole('dialog', {'name': 'Question has conditions and its type cannot be changed'}).should('not.exist');
+    });
+
     it('conditions count badge is updated when conditions are added or removed', () => {
         createForm();
         // Add two questions to the form
@@ -3117,5 +3212,79 @@ describe ('Conditions', () => {
 
         // Check that the target question is not visible anymore
         validateThatQuestionIsNotVisible('My target question');
+    });
+
+    it('condition dependency check takes priority over non-empty section warning', () => {
+        // This test ensures that if a section has both conditions dependencies AND contains elements,
+        // the condition dependency modal is shown first (blocking deletion),
+        // and the non-empty warning modal is not shown.
+
+        createForm();
+        addQuestion('My first question');
+        addSection('My section with conditions');
+        addQuestion('Question in section');
+        addComment('Comment in section');
+
+        saveAndReload();
+
+        // Add a condition to another element that uses this section
+        getAndFocusQuestion('My first question').within(() => {
+            initVisibilityConfiguration();
+            setConditionStrategy('Visible if...');
+            fillCondition(0, null, 'My section with conditions', 'Is visible', null, null);
+            closeConditionEditor();
+        });
+
+        // Try to delete the section with conditions (which also has elements)
+        getAndFocusSection('My section with conditions').within(() => {
+            cy.findByRole('button', {'name': 'More actions'}).click();
+            cy.findByRole('button', {'name': 'Delete section'}).click();
+        });
+
+        // Should show the conditions dependency modal, NOT the non-empty warning modal
+        cy.findByRole('dialog', {'name': 'Item has conditions and cannot be deleted'})
+            .should('be.visible')
+            .within(() => {
+                cy.findByRole('button', {'name': 'Close'}).click();
+            });
+
+        // The non-empty section modal should NOT have appeared
+        cy.findByRole('dialog', {'name': 'Delete non-empty section'}).should('not.exist');
+
+        // Section should still exist
+        cy.findAllByRole('region', {'name': 'Form section'}).should('have.length', 2);
+    });
+
+    it('blocks external dependencies when deleting non-empty section', () => {
+        // This test ensures that if a section contains elements that are used in conditions
+        // by elements OUTSIDE the section, the deletion is blocked with the condition dependency modal.
+
+        cy.importForm('form-with-question-destination-submit-button-conditions.json').then((id) => {
+            cy.visit(`front/form/form.form.php?id=${id}`);
+        });
+
+        // Try to delete the section that contains the question used in conditions
+        cy.findAllByRole('region', {'name': 'Section details'}).eq(1).click();
+        cy.findAllByRole('region', {'name': 'Section details'}).eq(1).within(() => {
+            cy.findByRole('button', {'name': 'More actions'}).click();
+            cy.findByRole('button', {'name': 'Delete section'}).click();
+        });
+
+        // Should show the conditions dependency modal, NOT the non-empty warning modal
+        cy.findByRole('dialog', {'name': 'Child items have conditions and cannot be deleted'})
+            .should('be.visible')
+            .within(() => {
+                // Should mention the question that has dependencies
+                cy.contains('Question in another section').should('exist');
+                cy.contains('Submit button visibility').should('exist');
+                cy.contains('Ticket').should('exist');
+                cy.findByRole('button', {'name': 'Close'}).click();
+            });
+
+        // The non-empty section modal should NOT have appeared
+        cy.findByRole('dialog', {'name': 'Delete non-empty section'}).should('not.exist');
+
+        // Section should still exist
+        cy.findAllByRole('region', {'name': 'Form section'}).should('have.length', 3);
     });
 });

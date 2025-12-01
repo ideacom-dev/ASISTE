@@ -1466,7 +1466,7 @@ HTML;
      **/
     public static function showItemTypeMenu(string $title, array $optgroup, string $value = '', array $options = []): void
     {
-        Toolbox::deprecated(version: '11.1.0');
+        Toolbox::deprecated(version: '12.0.0');
         $params = [
             'on_change'             => "var _value = this.options[this.selectedIndex].value; if (_value != 0) {window.location.href=_value;}",
             'width'                 => '300px',
@@ -2898,16 +2898,6 @@ HTML;
             $post['permit_select_parent'] = false;
         }
 
-        if (isset($post['condition']) && !empty($post['condition']) && !is_array($post['condition'])) {
-            // Retreive conditions from SESSION using its key
-            $key = $post['condition'];
-            if (isset($_SESSION['glpicondition']) && isset($_SESSION['glpicondition'][$key])) {
-                $post['condition'] = $_SESSION['glpicondition'][$key];
-            } else {
-                $post['condition'] = [];
-            }
-        }
-
         if (!isset($post['emptylabel']) || ($post['emptylabel'] == '')) {
             $post['emptylabel'] = Dropdown::EMPTY_VALUE;
         }
@@ -2952,7 +2942,17 @@ HTML;
 
         $ljoin = [];
 
-        if (isset($post['condition']) && !empty($post['condition'])) {
+        if (!empty($post['condition']) && !is_array($post['condition'])) {
+            // Retrieve conditions from SESSION using its key
+            $key = $post['condition'];
+            if (isset($_SESSION['glpicondition'][$key])) {
+                $post['condition'] = $_SESSION['glpicondition'][$key];
+            } else {
+                $post['condition'] = [];
+            }
+        }
+
+        if (!empty($post['condition'])) {
             if (isset($post['condition']['LEFT JOIN'])) {
                 $ljoin = $post['condition']['LEFT JOIN'];
                 unset($post['condition']['LEFT JOIN']);
@@ -2961,7 +2961,12 @@ HTML;
                 $where = array_merge($where, $post['condition']['WHERE']);
             } else {
                 foreach ($post['condition'] as $key => $value) {
-                    if (!is_numeric($key) && !in_array($key, ['AND', 'OR', 'NOT']) && !str_contains($key, '.')) {
+                    if (is_array($value) && isset($value['LEFT JOIN'])) {
+                        $ljoin = $value['LEFT JOIN'];
+                    }
+                    if (is_array($value) && isset($value['WHERE'])) {
+                        $where = array_merge($where, $value['WHERE']);
+                    } elseif (!is_numeric($key) && !in_array($key, ['AND', 'OR', 'NOT']) && !str_contains($key, '.')) {
                         // Ensure condition contains table name to prevent ambiguity with fields from `glpi_entities` table
                         $where["$table.$key"] = $value;
                     } else {
@@ -3687,7 +3692,7 @@ HTML;
                                         $data[$key]
                                     );
                                 }
-                                if ((strlen($withoutput) > 0) && ($withoutput != '&nbsp;')) {
+                                if (((string) $withoutput) !== '' && ($withoutput != '&nbsp;')) {
                                     $outputval = sprintf(__('%1$s - %2$s'), $outputval, $withoutput);
                                 }
                             }
@@ -3795,7 +3800,7 @@ HTML;
             $where["$table.is_template"] = 0;
         }
 
-        if (isset($post['searchText']) && (strlen($post['searchText']) > 0)) {
+        if (isset($post['searchText']) && ((string) $post['searchText']) !== '') {
             $search = Search::makeTextSearchValue($post['searchText']);
             $where['OR'] = [
                 "$table.name"        => ['LIKE', $search],
@@ -3992,7 +3997,7 @@ HTML;
             $where[] = State::getDisplayConditionForAssistance();
         }
 
-        if (isset($_POST['searchText']) && (strlen($post['searchText']) > 0)) {
+        if (isset($_POST['searchText']) && ((string) $post['searchText']) !== '') {
             $search = ['LIKE', Search::makeTextSearchValue($post['searchText'])];
             $orwhere = $item->isField('name') ? [
                 'name'   => $search,
@@ -4942,7 +4947,7 @@ HTML;
                     'title'             => sprintf(__('%1$s - %2$s'), $text, $user['name']),
                     'itemtype'          => "User",
                     'items_id'          => $ID,
-                    'use_notification'  => strlen($user['default_email'] ?? "") > 0 ? 1 : 0,
+                    'use_notification'  => ((string) ($user['default_email'] ?? "")) !== '' ? 1 : 0,
                     'default_email'     => $user['default_email'],
                     'alternative_email' => '',
                 ];
@@ -5016,7 +5021,7 @@ HTML;
                         $children['items_id']          = $children['id'];
                         $children['id']                = "Supplier_" . $children['id'];
                         $children['itemtype']          = "Supplier";
-                        $children['use_notification']  = strlen($supplier_obj->fields['email'] ?? '') > 0 ? 1 : 0;
+                        $children['use_notification']  = ((string) $supplier_obj->fields['email']) !== '' ? 1 : 0;
                         $children['default_email']     = $supplier_obj->fields['email'];
                         $children['alternative_email'] = '';
                     }

@@ -329,9 +329,13 @@ class User extends CommonDBTM implements TreeBrowseInterface
      * @return void
      *
      * @since 0.83.7
+     *
+     * @deprecated 12.0.0
      */
     public function loadMinimalSession($entities_id, $is_recursive)
     {
+        Toolbox::deprecated();
+
         if (isset($this->fields['id']) && !isset($_SESSION["glpiID"])) {
             Session::destroy();
             Session::start();
@@ -954,7 +958,7 @@ class User extends CommonDBTM implements TreeBrowseInterface
     public function pre_addInDB()
     {
         // Hash user_dn if set
-        if (isset($this->input['user_dn']) && is_string($this->input['user_dn']) && strlen($this->input['user_dn']) > 0) {
+        if (isset($this->input['user_dn']) && is_string($this->input['user_dn']) && $this->input['user_dn'] !== '') {
             $this->input['user_dn_hash'] = md5($this->input['user_dn']);
         }
     }
@@ -1069,7 +1073,9 @@ class User extends CommonDBTM implements TreeBrowseInterface
                     $extension = strtolower(pathinfo($fullpath, PATHINFO_EXTENSION));
                     $extension = in_array($extension, ['png', 'gif']) ? 'png' : 'jpg';
 
-                    @mkdir(GLPI_PICTURE_DIR . "/$sub");
+                    if (!file_exists(GLPI_PICTURE_DIR . "/$sub")) {
+                        mkdir(GLPI_PICTURE_DIR . "/$sub");
+                    }
                     $picture_path = GLPI_PICTURE_DIR . "/{$sub}/{$filename}.{$extension}";
                     self::dropPictureFiles("{$sub}/{$filename}.{$extension}");
 
@@ -2544,6 +2550,9 @@ class User extends CommonDBTM implements TreeBrowseInterface
             }
         }
 
+        // Load data from any potential existing user
+        $this->getFromDBbyName($this->fields['name']);
+
         if (count($a_field) == 0) {
             return true;
         }
@@ -2968,7 +2977,7 @@ HTML;
         // Hash user_dn if is updated
         if (in_array('user_dn', $this->updates)) {
             $this->updates[] = 'user_dn_hash';
-            $this->fields['user_dn_hash'] = is_string($this->input['user_dn']) && strlen($this->input['user_dn']) > 0
+            $this->fields['user_dn_hash'] = is_string($this->input['user_dn']) && $this->input['user_dn'] !== ''
                 ? md5($this->input['user_dn'])
                 : null;
         }
@@ -4069,7 +4078,7 @@ HTML;
         }
 
         if (!$count) {
-            if (strlen((string) $search) > 0) {
+            if (((string) $search) !== '') {
                 $txt_search = Search::makeTextSearchValue($search);
 
                 $firstname_field = self::getTableField('firstname');
@@ -4405,7 +4414,7 @@ HTML;
             $icons .= '</div>';
         }
 
-        if (strlen($icons) > 0) {
+        if ($icons !== '') {
             $output = "<div class='btn-group btn-group-sm " . ($p['width'] == "100%" ? "w-100" : "") . "' role='group'>{$output} {$icons}</div>";
         }
 
@@ -4735,7 +4744,6 @@ HTML;
             ],
             'entries'               => $entries,
             'total_number'          => $number,
-            'filtered_number'       => $number,
             'showmassiveactions'    => true,
             'massiveactionparams'   => [
                 'num_displayed'    => min($_SESSION['glpilist_limit'], $number),

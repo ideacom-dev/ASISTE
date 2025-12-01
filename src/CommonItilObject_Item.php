@@ -189,7 +189,7 @@ abstract class CommonItilObject_Item extends CommonDBRelation
      */
     protected static function displayItemAddForm(CommonITILObject|TicketRecurrent $obj, array $options = [])
     {
-        if (!($obj instanceof static::$itemtype_1)) {
+        if (!(is_a($obj, static::$itemtype_1))) {
             return false;
         }
 
@@ -378,7 +378,7 @@ abstract class CommonItilObject_Item extends CommonDBRelation
      **/
     protected static function showForObject(CommonITILObject|TicketRecurrent $obj)
     {
-        if (!($obj instanceof static::$itemtype_1)) {
+        if (!(is_a($obj, static::$itemtype_1))) {
             return false;
         }
 
@@ -511,7 +511,6 @@ TWIG, $twig_params);
             ],
             'entries' => $entries,
             'total_number' => count($entries),
-            'filtered_number' => count($entries),
             'showmassiveactions' => $canedit,
             'massiveactionparams' => [
                 'num_displayed' => count($entries),
@@ -538,7 +537,9 @@ TWIG, $twig_params);
 
             if ($item::class === static::$itemtype_1) {
                 if ($_SESSION['glpishow_count_on_tabs']) {
-                    $nb = static::countForMainItem($item);
+                    $nb = static::countForMainItem($item, [
+                        'itemtype' => $_SESSION["glpiactiveprofile"]["helpdesk_item_type"],
+                    ]);
                 }
                 return static::createTabEntry(_n('Item', 'Items', Session::getPluralNumber()), $nb, $item::class);
             } elseif ($_SESSION['glpishow_count_on_tabs'] && is_subclass_of(static::$itemtype_1, CommonITILObject::class)) {
@@ -1770,7 +1771,7 @@ TWIG, $twig_params);
      **/
     public static function itemAddForm(CommonITILObject|TicketRecurrent $object, $options = [])
     {
-        if (!($object instanceof static::$itemtype_1)) {
+        if (!(is_a($object, static::$itemtype_1))) {
             return;
         }
 

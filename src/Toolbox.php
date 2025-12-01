@@ -60,6 +60,7 @@ use Safe\Exceptions\CurlException;
 use Safe\Exceptions\ErrorfuncException;
 use Safe\Exceptions\FilesystemException;
 use Safe\Exceptions\ImageException;
+use Safe\Exceptions\InfoException;
 use Safe\Exceptions\JsonException;
 use Safe\Exceptions\PcreException;
 use Safe\Exceptions\UrlException;
@@ -97,6 +98,7 @@ use function Safe\imagepng;
 use function Safe\imagesavealpha;
 use function Safe\imagewebp;
 use function Safe\ini_get;
+use function Safe\ini_set;
 use function Safe\json_decode;
 use function Safe\json_encode;
 use function Safe\mb_convert_encoding;
@@ -613,14 +615,19 @@ class Toolbox
         $etag = md5_file($path);
         $lastModified = filemtime($path);
 
+        // remove headers automatically added by session start
+        header_remove('Pragma');
+        header_remove('Cache-Control');
+        header_remove('Expires');
+
         $headers = [
             'Last-Modified' => gmdate("D, d M Y H:i:s", $lastModified) . " GMT",
             'Etag'          => $etag,
-            'Cache-Control' => 'private',
+            'Cache-Control' => 'private, must-revalidate',
         ];
-        header_remove('Pragma');
         if ($expires_headers) {
             $max_age = WEEK_TIMESTAMP;
+            $headers['Cache-Control'] = 'private, max-age=' . $max_age . ', must-revalidate';
             $headers['Expires'] = gmdate('D, d M Y H:i:s \G\M\T', time() + $max_age);
         }
         $content_disposition = "$attachment filename=\""
@@ -1333,10 +1340,13 @@ class Toolbox
         $options = $extra_options + ['connect_timeout' => 5];
         // add proxy string if configured in glpi
         if (!empty($CFG_GLPI["proxy_name"])) {
-            $proxy_creds      = !empty($CFG_GLPI["proxy_user"])
-                ? $CFG_GLPI["proxy_user"] . ":" . (new GLPIKey())->decrypt($CFG_GLPI["proxy_passwd"]) . "@"
-                : "";
-            $proxy_string     = "http://{$proxy_creds}" . $CFG_GLPI['proxy_name'] . ":" . $CFG_GLPI['proxy_port'];
+            $proxy_creds = "";
+            if (!empty($CFG_GLPI["proxy_user"])) {
+                $proxy_user = rawurlencode($CFG_GLPI["proxy_user"]);
+                $proxy_pass = rawurlencode((new GLPIKey())->decrypt($CFG_GLPI["proxy_passwd"]));
+                $proxy_creds = $proxy_user . ":" . $proxy_pass . "@";
+            }
+            $proxy_string = "http://{$proxy_creds}" . $CFG_GLPI['proxy_name'] . ":" . $CFG_GLPI['proxy_port'];
             $options['proxy'] = $proxy_string;
         }
         return new Client($options);
@@ -1456,9 +1466,11 @@ class Toolbox
             ];
 
             if (!empty($CFG_GLPI["proxy_user"])) {
+                $proxy_user = rawurlencode($CFG_GLPI["proxy_user"]);
+                $proxy_pass = rawurlencode((new GLPIKey())->decrypt($CFG_GLPI["proxy_passwd"]));
                 $opts += [
                     CURLOPT_PROXYAUTH    => CURLAUTH_BASIC,
-                    CURLOPT_PROXYUSERPWD => $CFG_GLPI["proxy_user"] . ":" . (new GLPIKey())->decrypt($CFG_GLPI["proxy_passwd"]),
+                    CURLOPT_PROXYUSERPWD => $proxy_user . ":" . $proxy_pass,
                 ];
             }
 
@@ -3452,5 +3464,25 @@ class Toolbox
     public static function cleanPaths(string $message): string
     {
         return ErrorUtils::cleanPaths($message);
+    }
+
+    public static function safeIniSet(
+        string $name,
+        string|int $value,
+        string $loglvl = LogLevel::WARNING
+    ): void {
+        try {
+            ini_set($name, $value);
+        } catch (InfoException $e) {
+            self::log(
+                $loglvl,
+                [sprintf(
+                    'Unable to set `%s` to `%s`. This may be caused by a `php_admin_flag` or a `php_admin_value` directive in your web server configuration. Try to use `php_flag` or `php_value` instead. Error is: %s',
+                    $name,
+                    $value,
+                    $e->getMessage()
+                )],
+            );
+        }
     }
 }

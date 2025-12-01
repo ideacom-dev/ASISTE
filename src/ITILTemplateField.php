@@ -131,7 +131,7 @@ abstract class ITILTemplateField extends CommonDBChild
      *
      * @return bool
      **/
-    public static function showForITILTemplate(ITILTemplate $tt, $withtemplate = 0): bool
+    public static function showForITILTemplate(ITILTemplate $tt, $withtemplate = 0, $withtypeandcategory = true): bool
     {
         global $DB, $CFG_GLPI;
 
@@ -141,7 +141,7 @@ abstract class ITILTemplateField extends CommonDBChild
             return false;
         }
         $canedit = $tt->canEdit($ID);
-        $fields  = $tt->getAllowedFieldsNames(false);
+        $fields  = $tt->getAllowedFieldsNames($withtypeandcategory);
         $fields  = array_diff_key($fields, static::getExcludedFields());
         $display_options = [
             'relative_dates' => true,
@@ -292,7 +292,6 @@ TWIG, $twig_params);
             'entries' => $entries,
             'formatters' => ['value' => 'raw_html'],
             'total_number' => count($entries),
-            'filtered_number' => count($entries),
             'showmassiveactions' => $canedit,
             'massiveactionparams' => [
                 'num_displayed' => min($_SESSION['glpilist_limit'], $numrows),

@@ -43,13 +43,19 @@ use DBConnection;
 use DbTestCase;
 use Document;
 use Document_Item;
+use DropdownTranslation;
 use Entity;
 use Glpi\Asset\Capacity;
 use Glpi\Asset\Capacity\HasDocumentsCapacity;
 use Glpi\DBAL\QueryExpression;
+use Group;
+use Group_Item;
 use Group_User;
+use Location;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Psr\Log\LogLevel;
+use Session;
+use TaskCategory;
 use Ticket;
 use User;
 
@@ -1000,7 +1006,7 @@ class SearchTest extends DbTestCase
         }
 
         foreach ($itemtype_criteria as $itemtype => $criteria) {
-            if (empty($criteria)) {
+            if ($criteria === []) {
                 continue;
             }
 
@@ -1130,7 +1136,7 @@ class SearchTest extends DbTestCase
         $computer1 = getItemByTypeName('Computer', '_test_pc01');
 
         //create group that can be notified
-        $group = new \Group();
+        $group = new Group();
         $gid = $group->add(
             [
                 'name'         => '_test_group01',
@@ -2262,7 +2268,7 @@ class SearchTest extends DbTestCase
         ]);
 
         // add a group for tech user
-        $group = new \Group();
+        $group = new Group();
         $groups_id = $group->add([
             'name' => "test group for tech user",
         ]);
@@ -2332,7 +2338,7 @@ class SearchTest extends DbTestCase
         ]);
 
         // add a group for tech user
-        $group = new \Group();
+        $group = new Group();
         $groups_id = $group->add([
             'name' => "test group for tech user",
         ]);
@@ -2388,7 +2394,7 @@ class SearchTest extends DbTestCase
         ]);
 
         // add a group for tech user
-        $group = new \Group();
+        $group = new Group();
         $groups_id = $group->add([
             'name' => "test group for tech user",
         ]);
@@ -2447,7 +2453,7 @@ class SearchTest extends DbTestCase
         ]);
         $this->assertGreaterThan(0, $sid);
 
-        $ddtrans = new \DropdownTranslation();
+        $ddtrans = new DropdownTranslation();
         $this->assertGreaterThan(
             0,
             $ddtrans->add([
@@ -2722,7 +2728,7 @@ class SearchTest extends DbTestCase
         $displaypref = new \DisplayPreference();
         $input = [
             'itemtype'  => 'Computer',
-            'users_id'  => \Session::getLoginUserID(),
+            'users_id'  => Session::getLoginUserID(),
             'num'       => 49, //Computer groups_id_tech SO
         ];
         $this->assertGreaterThan(0, $displaypref->add($input));
@@ -2795,7 +2801,7 @@ class SearchTest extends DbTestCase
         $test_child_2    = getItemByTypeName('Entity', '_test_child_2', true);
         $test_child_3    = getItemByTypeName('Entity', '_test_child_3', true);
 
-        $data = $this->doSearch('AllAssets', [
+        $search_params = [
             'reset'      => 'reset',
             'is_deleted' => 0,
             'start'      => 0,
@@ -2808,7 +2814,8 @@ class SearchTest extends DbTestCase
                     'value'      => 'test',
                 ],
             ],
-        ]);
+        ];
+        $data = $this->doSearch('AllAssets', $search_params);
 
         $this->assertMatchesRegularExpression(
             "/OR\s*\(`glpi_entities`\.`completename`\s*LIKE '%test%'\s*\)/",
@@ -2850,6 +2857,26 @@ class SearchTest extends DbTestCase
                 $data['sql']['search']
             );
         }
+
+        $entities = [
+            $test_root,
+            $test_child_1,
+            $test_child_2,
+            $test_child_3,
+        ];
+        foreach ($entities as $entity) {
+            foreach ([true, false] as $is_recursive) {
+                Session::loadEntity($entity, $is_recursive);
+                $data = $this->doSearch('AllAssets', $search_params);
+
+                // Check that all returned items are viewable
+                foreach ($data['data']['rows'] as $row) {
+                    $asset = new $row['TYPE']();
+                    $asset->getFromDB($row['id']);
+                    $this->assertTrue($asset->canViewItem());
+                }
+            }
+        }
     }
 
     public function testSearchWithNamespacedItem()
@@ -2864,8 +2891,8 @@ class SearchTest extends DbTestCase
         $this->login();
         $this->setEntity('_test_root_entity', true);
 
-        $CFG_GLPI['state_types'][] = 'SearchTest\\Computer';
-        $data = $this->doSearch('SearchTest\\Computer', $search_params);
+        $CFG_GLPI['state_types'][] = \SearchTest\Computer::class;
+        $data = $this->doSearch(\SearchTest\Computer::class, $search_params);
 
         $this->assertStringContainsString(
             "`glpi_computers`.`name` AS `ITEM_SearchTest\Computer_1`",
@@ -4868,7 +4895,7 @@ class SearchTest extends DbTestCase
         $displaypref = new \DisplayPreference();
         $input = [
             'itemtype'  => 'Ticket',
-            'users_id'  => \Session::getLoginUserID(),
+            'users_id'  => Session::getLoginUserID(),
             'num'       => 55, //Ticket glpi_ticketvalidations.status
         ];
         $this->assertGreaterThan(
@@ -6162,6 +6189,319 @@ class SearchTest extends DbTestCase
                 . '<a href=\'mailto:external-requester2@example.com\'>external-requester2@example.com</a>',
             $result['data']['rows'][0]['Ticket_4']['displayname']
         );
+    }
+
+    /**
+     * Validate that dropdown complete names are correctly rendered.
+     */
+    public function testCompletenameColumnRenderingInSearchResults(): void
+    {
+        $this->login();
+
+        $cat_1_id    = \getItemByTypeName(TaskCategory::class, '_cat_1', true);
+        $subcat_1_id = \getItemByTypeName(TaskCategory::class, '_subcat_1', true);
+        $rnd_cat_id  = \getItemByTypeName(TaskCategory::class, 'R&D', true);
+
+        $new_subcat = $this->createItem(
+            TaskCategory::class,
+            [
+                'name'              => 'subcat with <&> chars',
+                'taskcategories_id' => $cat_1_id,
+                'entities_id'       => $this->getTestRootEntity(true),
+            ]
+        );
+
+        $result = \Search::getDatas(
+            TaskCategory::class,
+            [
+                'criteria' => [
+                    [
+                        'field'      => '1',
+                        'searchtype' => 'contains',
+                        'value'      => '_cat_1',
+                    ],
+                ],
+            ]
+        );
+
+        $expected = [
+            "<a id='TaskCategory_{$cat_1_id}_{$cat_1_id}' href='/front/taskcategory.form.php?id={$cat_1_id}'><span >_cat_1</span></a>",
+            "<a id='TaskCategory_{$subcat_1_id}_{$subcat_1_id}' href='/front/taskcategory.form.php?id={$subcat_1_id}'><span class=\"text-muted\">_cat_1</span> &gt; <span >_subcat_1</span></a>",
+            "<a id='TaskCategory_{$rnd_cat_id}_{$rnd_cat_id}' href='/front/taskcategory.form.php?id={$rnd_cat_id}'><span class=\"text-muted\">_cat_1</span> &gt; <span >R&amp;D</span></a>",
+            "<a id='TaskCategory_{$new_subcat->getID()}_{$new_subcat->getID()}' href='/front/taskcategory.form.php?id={$new_subcat->getID()}'><span class=\"text-muted\">_cat_1</span> &gt; <span >subcat with &lt;&amp;&gt; chars</span></a>",
+        ];
+
+        foreach ($expected as $key => $displayname) {
+            $this->assertTrue(isset($result['data']['rows'][$key]['TaskCategory_1']['displayname']));
+            $this->assertEquals($displayname, $result['data']['rows'][$key]['TaskCategory_1']['displayname']);
+        }
+    }
+
+    /**
+     * Validate that dropdown complete names are correctly translated.
+     */
+    public function testCompletenameColumnTranslationsInSearchResults(): void
+    {
+        $this->login();
+
+        $cat_1_id    = \getItemByTypeName(TaskCategory::class, '_cat_1', true);
+        $subcat_1_id = \getItemByTypeName(TaskCategory::class, '_subcat_1', true);
+        $rnd_cat_id  = \getItemByTypeName(TaskCategory::class, 'R&D', true);
+
+        $_SESSION['glpilanguage'] = 'fr_FR';
+        $_SESSION['glpi_dropdowntranslations'] = DropdownTranslation::getAvailableTranslations('fr_FR');
+
+        $result = \Search::getDatas(
+            TaskCategory::class,
+            [
+                'criteria' => [
+                    [
+                        'field'      => '1',
+                        'searchtype' => 'contains',
+                        'value'      => '_cat_1',
+                    ],
+                ],
+            ]
+        );
+
+        $expected = [
+            "<a id='TaskCategory_{$cat_1_id}_{$cat_1_id}' href='/front/taskcategory.form.php?id={$cat_1_id}'><span >FR - _cat_1</span></a>",
+            "<a id='TaskCategory_{$subcat_1_id}_{$subcat_1_id}' href='/front/taskcategory.form.php?id={$subcat_1_id}'><span class=\"text-muted\">FR - _cat_1</span> &gt; <span >FR - _subcat_1</span></a>",
+            "<a id='TaskCategory_{$rnd_cat_id}_{$rnd_cat_id}' href='/front/taskcategory.form.php?id={$rnd_cat_id}'><span class=\"text-muted\">FR - _cat_1</span> &gt; <span >R&amp;D</span></a>",
+        ];
+
+        foreach ($expected as $key => $displayname) {
+            $this->assertTrue(isset($result['data']['rows'][$key]['TaskCategory_1']['displayname']));
+            $this->assertEquals($displayname, $result['data']['rows'][$key]['TaskCategory_1']['displayname']);
+        }
+    }
+
+    /**
+     * Validate that `use_flat_dropdowntree_on_search_result` is correctly applied for `completename+itemlink`.
+     */
+    public function testForeignItemlinkCompletenameColumnRenderingInSearchResults(): void
+    {
+        $this->login();
+
+        $user_id    = \getItemByTypeName(User::class, 'glpi', true);
+        $group_1_id = \getItemByTypeName(Group::class, '_test_group_1', true);
+        $group_2_id = \getItemByTypeName(Group::class, '_test_group_2', true);
+
+        $this->createItems(
+            Group_User::class,
+            [
+                [
+                    'users_id'  => $user_id,
+                    'groups_id' => $group_1_id,
+                ],
+                [
+                    'users_id'  => $user_id,
+                    'groups_id' => $group_2_id,
+                ],
+            ]
+        );
+
+        // Test with `use_flat_dropdowntree_on_search_result=1`
+        $_SESSION['glpiuse_flat_dropdowntree_on_search_result'] = 1;
+        $result = \Search::getDatas(
+            User::class,
+            [
+                'criteria' => [
+                    [
+                        'field'      => '1',
+                        'searchtype' => 'contains',
+                        'value'      => 'glpi',
+                    ],
+                ],
+                'forcetoview' => [13],
+            ]
+        );
+
+        $this->assertTrue(isset($result['data']['rows'][0]['User_13']['displayname']));
+        $this->assertEquals(
+            "<a id='Group_{$user_id}_{$group_1_id}' href='/front/group.form.php?id={$group_1_id}'><span >_test_group_1</span></a>"
+                . "#LBBR#"
+                . "<a id='Group_{$user_id}_{$group_2_id}' href='/front/group.form.php?id={$group_2_id}'><span class=\"text-muted\">_test_group_1</span> &gt; <span >_test_group_2</span></a>",
+            $result['data']['rows'][0]['User_13']['displayname']
+        );
+
+        // Test with `use_flat_dropdowntree_on_search_result=0`
+        $_SESSION['glpiuse_flat_dropdowntree_on_search_result'] = 0;
+        $result = \Search::getDatas(
+            User::class,
+            [
+                'criteria' => [
+                    [
+                        'field'      => '1',
+                        'searchtype' => 'contains',
+                        'value'      => 'glpi',
+                    ],
+                ],
+                'forcetoview' => [13],
+            ]
+        );
+
+        $this->assertTrue(isset($result['data']['rows'][0]['User_13']['displayname']));
+        $this->assertEquals(
+            "<a id='Group_{$user_id}_{$group_1_id}' href='/front/group.form.php?id={$group_1_id}'><span >_test_group_1</span></a>"
+                . "#LBBR#"
+                . "<a id='Group_{$user_id}_{$group_2_id}' href='/front/group.form.php?id={$group_2_id}'><span >_test_group_2</span></a>",
+            $result['data']['rows'][0]['User_13']['displayname']
+        );
+    }
+
+    /**
+     * Validate that `use_flat_dropdowntree_on_search_result` is correctly applied for `completename+dropdown` SO with unique value.
+     */
+    public function testForeignDropdownCompletenameColumnRenderingInSearchResults(): void
+    {
+        $this->login();
+
+        $this->createItem(
+            Computer::class,
+            [
+                'name'         => __FUNCTION__,
+                'locations_id' => \getItemByTypeName(Location::class, '_location02 > _sublocation04', true),
+                'entities_id'  => $this->getTestRootEntity(true),
+            ]
+        );
+
+        // Test with `use_flat_dropdowntree_on_search_result=1`
+        $_SESSION['glpiuse_flat_dropdowntree_on_search_result'] = 1;
+        $result = \Search::getDatas(
+            Computer::class,
+            [
+                'criteria' => [
+                    [
+                        'field'      => '1',
+                        'searchtype' => 'contains',
+                        'value'      => __FUNCTION__,
+                    ],
+                ],
+            ]
+        );
+
+        $this->assertTrue(isset($result['data']['rows'][0]['Computer_3']['displayname']));
+        $this->assertEquals('_location02 &gt; _sublocation04', $result['data']['rows'][0]['Computer_3']['displayname']);
+
+        // Test with `use_flat_dropdowntree_on_search_result=0`
+        $_SESSION['glpiuse_flat_dropdowntree_on_search_result'] = 0;
+        $result = \Search::getDatas(
+            Computer::class,
+            [
+                'criteria' => [
+                    [
+                        'field'      => '1',
+                        'searchtype' => 'contains',
+                        'value'      => __FUNCTION__,
+                    ],
+                ],
+            ]
+        );
+
+        $this->assertTrue(isset($result['data']['rows'][0]['Computer_3']['displayname']));
+        $this->assertEquals('_sublocation04', $result['data']['rows'][0]['Computer_3']['displayname']);
+    }
+
+    /**
+     * Validate that `use_flat_dropdowntree_on_search_result` is correctly applied for `completename+dropdown` SO with multiple values.
+     */
+    public function testMultipleForeignDropdownCompletenameColumnRenderingInSearchResults(): void
+    {
+        $this->login();
+
+        $computer = $this->createItem(
+            Computer::class,
+            [
+                'name'        => __FUNCTION__,
+                'entities_id' => $this->getTestRootEntity(true),
+            ]
+        );
+        $this->createItems(
+            Group_Item::class,
+            [
+                [
+                    'groups_id' => \getItemByTypeName(Group::class, '_test_group_1', true),
+                    'itemtype'  => Computer::class,
+                    'items_id'  => $computer->getID(),
+                    'type'      => Group_Item::GROUP_TYPE_NORMAL,
+                ],
+                [
+                    'groups_id' => \getItemByTypeName(Group::class, '_test_group_2', true),
+                    'itemtype'  => Computer::class,
+                    'items_id'  => $computer->getID(),
+                    'type'      => Group_Item::GROUP_TYPE_NORMAL,
+                ],
+            ]
+        );
+
+        // Test with `use_flat_dropdowntree_on_search_result=1`
+        $_SESSION['glpiuse_flat_dropdowntree_on_search_result'] = 1;
+        $result = \Search::getDatas(
+            Computer::class,
+            [
+                'criteria' => [
+                    [
+                        'field'      => '1',
+                        'searchtype' => 'equals',
+                        'value'      => $computer->getID(),
+                    ],
+                ],
+                'forcetoview' => [71],
+            ]
+        );
+
+        $this->assertTrue(isset($result['data']['rows'][0]['Computer_71']['displayname']));
+        $this->assertEquals(
+            '_test_group_1#LBBR#_test_group_1 &gt; _test_group_2',
+            $result['data']['rows'][0]['Computer_71']['displayname']
+        );
+
+        // Test with `use_flat_dropdowntree_on_search_result=0`
+        $_SESSION['glpiuse_flat_dropdowntree_on_search_result'] = 0;
+        $result = \Search::getDatas(
+            Computer::class,
+            [
+                'criteria' => [
+                    [
+                        'field'      => '1',
+                        'searchtype' => 'equals',
+                        'value'      => $computer->getID(),
+                    ],
+                ],
+                'forcetoview' => [71],
+            ]
+        );
+
+        $this->assertTrue(isset($result['data']['rows'][0]['Computer_71']['displayname']));
+        $this->assertEquals(
+            '_test_group_1#LBBR#_test_group_2',
+            $result['data']['rows'][0]['Computer_71']['displayname']
+        );
+    }
+
+    /**
+     * Validate that the `notcontains` search on "user" itemlink column does not fail.
+     */
+    public function testUsernameNotContainsSearch(): void
+    {
+        $this->login();
+
+        $result = \Search::getDatas(
+            Computer::class,
+            [
+                'criteria' => [
+                    [
+                        'field'      => '24', // users_id_tech
+                        'searchtype' => 'notcontains',
+                        'value'      => 'whatever',
+                    ],
+                ],
+            ]
+        );
+
+        // we just check that the search did not failed with an exception
+        $this->assertTrue(isset($result['data']['totalcount']));
     }
 }
 

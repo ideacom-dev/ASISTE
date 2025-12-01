@@ -1268,7 +1268,7 @@ TWIG,
             ],
         ];
 
-        if ($can_read_dashboard && strlen($default_asset_dashboard) > 0) {
+        if ($can_read_dashboard && $default_asset_dashboard !== '') {
             $menu['assets']['default_dashboard'] = '/front/dashboard_assets.php';
         }
 
@@ -1283,7 +1283,7 @@ TWIG,
             ],
         ];
 
-        if ($can_read_dashboard && strlen($default_asset_helpdesk) > 0) {
+        if ($can_read_dashboard && $default_asset_helpdesk !== '') {
             $menu['helpdesk']['default_dashboard'] = '/front/dashboard_helpdesk.php';
         }
 
@@ -3862,7 +3862,7 @@ JAVASCRIPT
      * @psalm-taint-specialize (to report each unsafe usage as a distinct error)
      * @psalm-taint-sink html $additional_info (string will be added to HTML source)
      *
-     * @TODO Deprecate $additional_info, $display and $additional_params params in GLPI 11.1, they are not used.
+     * @TODO Deprecate $additional_info, $display and $additional_params params in GLPI 12.0, they are not used.
      **/
     public static function printAjaxPager($title, $start, $numrows, $additional_info = '', $display = true, $additional_params = '')
     {
@@ -4027,7 +4027,7 @@ JAVASCRIPT
      * @psalm-taint-specialize (to report each unsafe usage as a distinct error)
      * @psalm-taint-sink html $additional_info (string will be added to HTML source)
      *
-     * @TODO Deprecate $additional_info param in GLPI 11.1, it is not used.
+     * @TODO Deprecate $additional_info param in GLPI 12.0, it is not used.
      * @TODO Accept an array of key/values in the $parameters param to ease its usage/escaping.
      */
     public static function printPager(
@@ -4752,7 +4752,7 @@ JS;
      *     - `confirmaction` optional action to do on confirmation
      * @return string an `a` element.
      *
-     * @TODO Deprecate this method in GLPI 11.1, it is not used anymore in GLPI itself.
+     * @TODO Deprecate this method in GLPI 12.0, it is not used anymore in GLPI itself.
      **/
     public static function link($text, $url, $options = [])
     {
@@ -6282,7 +6282,7 @@ JS);
         // retrieve menu
         foreach ($_SESSION['glpimenu'] as $firstlvl) {
             if (isset($firstlvl['default'])) {
-                if (strlen($firstlvl['title']) > 0) {
+                if ((string) $firstlvl['title'] !== '') {
                     $fuzzy_entries[] = [
                         'url'   => self::getPrefixedUrl($firstlvl['default']),
                         'title' => $firstlvl['title'],
@@ -6291,7 +6291,7 @@ JS);
             }
 
             if (isset($firstlvl['default_dashboard'])) {
-                if (strlen($firstlvl['title']) > 0) {
+                if ((string) $firstlvl['title'] !== '') {
                     $fuzzy_entries[] = [
                         'url'   => self::getPrefixedUrl($firstlvl['default_dashboard']),
                         'title' => $firstlvl['title'] . " > " . __('Dashboard'),
@@ -6301,7 +6301,7 @@ JS);
 
             if (isset($firstlvl['content'])) {
                 foreach ($firstlvl['content'] as $menu) {
-                    if (isset($menu['title']) && strlen($menu['title']) > 0) {
+                    if (isset($menu['title']) && (string) $menu['title'] !== '') {
                         $fuzzy_entries[] = [
                             'url'   => self::getPrefixedUrl($menu['page']),
                             'title' => $firstlvl['title'] . " > " . $menu['title'],
@@ -6309,7 +6309,7 @@ JS);
 
                         if (isset($menu['options'])) {
                             foreach ($menu['options'] as $submenu) {
-                                if (isset($submenu['title']) && strlen($submenu['title']) > 0) {
+                                if (isset($submenu['title']) && (string) $submenu['title'] !== '') {
                                     $fuzzy_entries[] = [
                                         'url'   => self::getPrefixedUrl($submenu['page']),
                                         'title' => $firstlvl['title'] . " > "

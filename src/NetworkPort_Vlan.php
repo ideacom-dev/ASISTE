@@ -55,6 +55,8 @@ class NetworkPort_Vlan extends CommonDBRelation
     /**
      * @param integer $portID
      * @param integer $vlanID
+     *
+     * @return bool
      **/
     public function unassignVlan($portID, $vlanID)
     {
@@ -186,7 +188,6 @@ TWIG, $twig_params);
             ],
             'entries' => $entries,
             'total_number' => count($entries),
-            'filtered_number' => count($entries),
             'showmassiveactions' => $canedit,
             'massiveactionparams' => [
                 'num_displayed' => count($entries),
@@ -195,6 +196,11 @@ TWIG, $twig_params);
         ]);
     }
 
+    /**
+     * @param Vlan $vlan
+     *
+     * @return false|void
+     */
     public static function showForVlan(Vlan $vlan)
     {
         global $DB;
@@ -253,7 +259,6 @@ TWIG, $twig_params);
             ],
             'entries' => $entries,
             'total_number' => count($entries),
-            'filtered_number' => count($entries),
             'showmassiveactions' => $canedit,
             'massiveactionparams' => [
                 'num_displayed' => count($entries),

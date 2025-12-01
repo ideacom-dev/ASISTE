@@ -488,6 +488,15 @@ class AuthLDAP extends CommonDBTM
         if (!Config::canUpdate()) {
             return false;
         }
+
+        // warning and no form if can't read keyfile
+        $glpi_encryption_key = new GLPIKey();
+        if ($glpi_encryption_key->hasReadErrors()) {
+            $glpi_encryption_key->showReadErrors();
+
+            return false;
+        }
+
         if (empty($ID)) {
             $this->getEmpty();
             if (isset($options['preconfig'])) {
@@ -547,6 +556,14 @@ TWIG, $twig_params);
      */
     public function showFormAdvancedConfig()
     {
+        // warning and no form if can't read keyfile
+        $glpi_encryption_key = new GLPIKey();
+        if ($glpi_encryption_key->hasReadErrors()) {
+            $glpi_encryption_key->showReadErrors();
+
+            return;
+        }
+
         TemplateRenderer::getInstance()->display('pages/setup/ldap/adv_info.html.twig', [
             'item' => $this,
             'page_size_available' => self::isLdapPageSizeAvailable(false, false),
@@ -639,7 +656,6 @@ TWIG, ['authldaps_id' => $ID]);
                 ],
                 'entries' => $entries,
                 'total_number' => count($entries),
-                'filtered_number' => count($entries),
                 'showmassiveactions' => true,
                 'massiveactionparams' => [
                     'num_displayed' => count($entries),
@@ -1700,7 +1716,6 @@ TWIG, $twig_params);
             ],
             'entries' => $entries,
             'total_number' => $total_results,
-            'filtered_number' => $total_results,
             'showmassiveactions' => true,
             'massiveactionparams' => [
                 'num_displayed' => count($entries),
@@ -2211,7 +2226,6 @@ TWIG, $twig_params);
             ],
             'entries' => $entries,
             'total_number' => $total_results,
-            'filtered_number' => $total_results,
             'showmassiveactions' => true,
             'massiveactionparams' => [
                 'num_displayed' => count($entries),
@@ -2815,6 +2829,10 @@ TWIG, $twig_params);
      */
     public function connect()
     {
+        if ($this->fields['is_active'] != 1) {
+            return false;
+        }
+
         return self::connectToServer(
             $this->fields['host'],
             $this->fields['port'],

@@ -134,7 +134,7 @@ final class Form extends CommonDBTM implements
     }
 
     #[Override]
-    public static function getIcon()
+    public static function getIcon(): string
     {
         return "ti ti-forms";
     }
@@ -367,7 +367,7 @@ final class Form extends CommonDBTM implements
         return parent::prepareInputForUpdate($input);
     }
 
-    private function prepareInput($input): array
+    private function prepareInput(array $input): array
     {
         if (isset($input['_conditions'])) {
             $input['submit_button_conditions'] = json_encode($input['_conditions']);
@@ -451,38 +451,32 @@ final class Form extends CommonDBTM implements
         $key = sprintf('%s_%d', self::getType(), $this->getID());
         $category_name = __('Form properties');
         $handlers = [];
-        if (!empty($this->fields['name'])) {
-            $handlers[$key][] = new TranslationHandler(
-                item: $this,
-                key: self::TRANSLATION_KEY_NAME,
-                name: __('Form title'),
-                value: $this->fields['name'],
-                is_rich_text: false,
-                category: $category_name
-            );
-        }
+        $handlers[$key][] = new TranslationHandler(
+            item: $this,
+            key: self::TRANSLATION_KEY_NAME,
+            name: __('Form title'),
+            value: $this->fields['name'],
+            is_rich_text: false,
+            category: $category_name
+        );
 
-        if (!empty($this->fields['header'])) {
-            $handlers[$key][] = new TranslationHandler(
-                item: $this,
-                key: self::TRANSLATION_KEY_HEADER,
-                name: __('Form description'),
-                value: $this->fields['header'],
-                is_rich_text: true,
-                category: $category_name
-            );
-        }
+        $handlers[$key][] = new TranslationHandler(
+            item: $this,
+            key: self::TRANSLATION_KEY_HEADER,
+            name: __('Form description'),
+            value: $this->fields['header'],
+            is_rich_text: true,
+            category: $category_name
+        );
 
-        if (!empty($this->fields['description'])) {
-            $handlers[$key][] = new TranslationHandler(
-                item: $this,
-                key: self::TRANSLATION_KEY_DESCRIPTION,
-                name: __('Service catalog description'),
-                value: $this->fields['description'],
-                is_rich_text: true,
-                category: $category_name
-            );
-        }
+        $handlers[$key][] = new TranslationHandler(
+            item: $this,
+            key: self::TRANSLATION_KEY_DESCRIPTION,
+            name: __('Service catalog description'),
+            value: $this->fields['description'],
+            is_rich_text: true,
+            category: $category_name
+        );
 
         $sections_handlers = array_map(
             fn($section) => $section->listTranslationsHandlers(),
@@ -747,12 +741,18 @@ final class Form extends CommonDBTM implements
             FormTranslation::class,
         ];
     }
+
+    /** @param array $input */
     public function prepareInputForClone($input): array
     {
         $input = $this->parentPrepareInputForClone($input);
         return FormCloneHelper::getInstance()->prepareFormInputForClone($input);
     }
 
+    /**
+     *  @param CommonDBTM $source
+     *  @param bool $history
+     */
     public function post_clone($source, $history): void
     {
         FormCloneHelper::getInstance()->postFormClone($this);

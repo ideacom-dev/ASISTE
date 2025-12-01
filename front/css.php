@@ -38,14 +38,13 @@ require_once(__DIR__ . '/_check_webserver_config.php');
 use Glpi\Application\Environment;
 use Glpi\UI\ThemeManager;
 
-use function Safe\ini_set;
 use function Safe\preg_match;
 
 if (preg_match('~^css/glpi(\.scss)?$~', $_GET['file'] ?? '') === 1) {
     // Ensure to have enough memory to not reach memory limit.
     $max_memory = Html::MAIN_SCSS_COMPILATION_REQUIRED_MEMORY;
     if (Toolbox::getMemoryLimit() < ($max_memory * 1024 * 1024)) {
-        ini_set('memory_limit', sprintf('%dM', $max_memory));
+        Toolbox::safeIniSet('memory_limit', sprintf('%dM', $max_memory));
     }
 }
 
@@ -68,10 +67,9 @@ header('Content-Type: text/css');
 $is_cacheable = !isset($_GET['nocache']) && Environment::get()->shouldForceExtraBrowserCache();
 if ($is_cacheable) {
     // Makes CSS cacheable by browsers and proxies
-    $max_age = WEEK_TIMESTAMP;
-    header_remove('Pragma');
-    header('Cache-Control: public');
-    header('Cache-Control: max-age=' . $max_age);
+    $max_age = MONTH_TIMESTAMP;
+    // no `must-revalidate`, a `v=xxx` param is used to prevent extensive caching issues
+    header('Cache-Control: public, max-age=' . $max_age);
     header('Expires: ' . gmdate('D, d M Y H:i:s \G\M\T', time() + $max_age));
 }
 

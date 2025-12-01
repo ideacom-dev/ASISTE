@@ -44,8 +44,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use Symfony\Component\ErrorHandler\ErrorHandler as BaseErrorHandler;
 use Throwable;
-
-use function Safe\ini_set;
+use Toolbox;
 
 /**
  * @phpstan-ignore class.extendsFinalByPhpDoc
@@ -90,8 +89,10 @@ final class ErrorHandler extends BaseErrorHandler
 
     /**
      * Indicates whether the error messages should be buffered instead of being displayed immediately.
+     * By default, messages are buffered only on Web context to prevent any output before headers are sent
+     * and to be able to NOT output them on specific context (JS/JSON response for instance).
      */
-    private static bool $is_buffer_active = true;
+    private static bool $is_buffer_active = (PHP_SAPI === 'cli');
 
     /**
      * @var list<array{error_label: string, message: string, log_level: string}>
@@ -294,7 +295,7 @@ final class ErrorHandler extends BaseErrorHandler
      */
     private function disableNativeErrorDisplaying(): void
     {
-        ini_set('display_errors', 'Off');
+        Toolbox::safeIniSet('display_errors', 'Off');
     }
 
     private static function cleanPaths(string $message): string

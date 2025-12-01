@@ -108,7 +108,7 @@ class SoftwareLicense_User extends CommonDBRelation
         return $iterator->current()['cpt'];
     }
 
-    private static function showForUser(CommonDBTM $item, $withtemplate = 0): void
+    private static function showForUser(CommonDBTM $item, int $withtemplate = 0): void
     {
         $ID = $item->fields['id'];
 
@@ -210,7 +210,6 @@ TWIG, $twig_params);
             ],
             'entries' => $entries,
             'total_number' => count($entries),
-            'filtered_number' => count($entries),
             'showmassiveactions' => $canedit && (int) $withtemplate !== 2,
             'massiveactionparams' => [
                 'num_displayed' => count($entries),

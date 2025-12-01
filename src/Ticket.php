@@ -45,6 +45,7 @@ use Glpi\Event;
 use Glpi\RichText\RichText;
 use Glpi\RichText\UserMention;
 use Glpi\Search\DefaultSearchRequestInterface;
+use Glpi\Urgency;
 use Safe\DateTime;
 
 use function Safe\preg_match;
@@ -1658,7 +1659,7 @@ class Ticket extends CommonITILObject implements DefaultSearchRequestInterface
             isset($this->input["_followup"])
             && is_array($this->input["_followup"])
             && isset($this->input["_followup"]['content'])
-            && (strlen($this->input["_followup"]['content']) > 0)
+            && ((string) $this->input["_followup"]['content']) !== ''
         ) {
             $fup  = new ITILFollowup();
             $type = "new";
@@ -1944,15 +1945,7 @@ class Ticket extends CommonITILObject implements DefaultSearchRequestInterface
     }
 
 
-    /**
-     * Update date mod of the ticket
-     *
-     * @since 0.83.3 new proto
-     *
-     * @param $ID                           ID of the ticket
-     * @param $no_stat_computation  boolean do not cumpute take into account stat (false by default)
-     * @param $users_id_lastupdater integer to force last_update id (default 0 = not used)
-     **/
+    #[Override]
     public function updateDateMod($ID, $no_stat_computation = false, $users_id_lastupdater = 0)
     {
 
@@ -1962,7 +1955,7 @@ class Ticket extends CommonITILObject implements DefaultSearchRequestInterface
                 && !$this->isAlreadyTakenIntoAccount()
                 && ($this->canTakeIntoAccount() || isCommandLine())
             ) {
-                return $this->update(
+                $this->update(
                     [
                         'id'                         => $ID,
                         'takeintoaccount_delay_stat' => $this->computeTakeIntoAccountDelayStat(),
@@ -3489,7 +3482,7 @@ JAVASCRIPT;
             'name'                      => '',
             'content'                   => '',
             'itilcategories_id'         => 0,
-            'urgency'                   => 3,
+            'urgency'                   => Urgency::MEDIUM->value,
             'impact'                    => 3,
             'priority'                  => self::computePriority(3, 3),
             'requesttypes_id'           => $requesttype,
@@ -3521,6 +3514,7 @@ JAVASCRIPT;
             '_tag_filename'             => [],
             '_actors'                   => [],
             '_contracts_id'             => 0,
+            'externalid'                => '',
         ];
     }
 

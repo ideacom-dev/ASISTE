@@ -135,32 +135,28 @@ final class Question extends CommonDBChild implements BlockInterface, Conditiona
         $key = sprintf('%s_%d', self::getType(), $this->getID());
         $category_name = sprintf('%s: %s', self::getTypeName(), $this->getName());
         $handlers = [];
-        if (!empty($this->fields['name'])) {
-            $handlers[$key][] = new TranslationHandler(
-                item: $this,
-                key: self::TRANSLATION_KEY_NAME,
-                name: __('Question name'),
-                value: $this->fields['name'],
-                is_rich_text: false,
-                category: $category_name
-            );
-        }
+        $handlers[$key][] = new TranslationHandler(
+            item: $this,
+            key: self::TRANSLATION_KEY_NAME,
+            name: __('Question name'),
+            value: $this->fields['name'],
+            is_rich_text: false,
+            category: $category_name
+        );
 
-        if (!empty($this->fields['description'])) {
-            $handlers[$key][] = new TranslationHandler(
-                item: $this,
-                key: self::TRANSLATION_KEY_DESCRIPTION,
-                name: __('Question description'),
-                value: $this->fields['description'],
-                is_rich_text: true,
-                category: $category_name
-            );
-        }
+        $handlers[$key][] = new TranslationHandler(
+            item: $this,
+            key: self::TRANSLATION_KEY_DESCRIPTION,
+            name: __('Question description'),
+            value: $this->fields['description'],
+            is_rich_text: true,
+            category: $category_name
+        );
 
         $question_type = $this->getQuestionType();
         if ($question_type instanceof TranslationAwareQuestionType) {
             $handlers[$key] = array_merge(
-                $handlers[$key] ?? [],
+                $handlers[$key],
                 array_values($question_type->listTranslationsHandlers($this))
             );
         }
@@ -334,7 +330,7 @@ final class Question extends CommonDBChild implements BlockInterface, Conditiona
         return FormCloneHelper::getInstance()->prepareQuestionInputForClone($input);
     }
 
-    private function prepareInput($input): array
+    private function prepareInput(array $input): array
     {
         $is_creating = ($input['id'] ?? 0) === 0;
 

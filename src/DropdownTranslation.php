@@ -423,7 +423,6 @@ TWIG, $twig_params);
             ],
             'entries' => $entries,
             'total_number' => count($entries),
-            'filtered_number' => count($entries),
             'showmassiveactions' => $canedit,
             'massiveactionparams' => [
                 'num_displayed' => count($entries),
@@ -571,7 +570,9 @@ TWIG, $twig_params);
                 // The field is already translated in this language
                 if (count($iterator)) {
                     $current = $iterator->current();
-                    return $current['value'];
+                    if ($current['value'] !== null && $current['value'] !== "") {
+                        return $current['value'];
+                    }
                 }
             }
             // Get the value coming from the dropdown table
@@ -582,11 +583,13 @@ TWIG, $twig_params);
             ]);
             if (count($iterator)) {
                 $current = $iterator->current();
-                return $current[$field];
+                if ($current[$field] !== null && $current[$field] !== "") {
+                    return $current[$field];
+                }
             }
         }
 
-        return "";
+        return $value;
     }
 
     /**

@@ -385,9 +385,9 @@ class Config extends CommonDBTM
     {
         global $CFG_GLPI;
 
-        if (array_key_exists('smtp_mode', $input) && $input['smtp_mode'] === MAIL_SMTPSSL) {
+        if (array_key_exists('smtp_mode', $input) && in_array($input['smtp_mode'], [MAIL_SMTPSSL, MAIL_SMTPTLS], true)) {
             $input['smtp_mode'] = MAIL_SMTP;
-            Toolbox::deprecated('Usage of "MAIL_SMTPSSL" SMTP mode is deprecated. Switch to "MAIL_SMTP" mode.');
+            Toolbox::deprecated('Usage of "MAIL_SMTPTLS" and "MAIL_SMTPTLS" SMTP mode is deprecated. Switch to "MAIL_SMTP" mode.');
         }
 
         if (array_key_exists('smtp_mode', $input) && (int) $input['smtp_mode'] === MAIL_SMTPOAUTH) {
@@ -936,7 +936,7 @@ class Config extends CommonDBTM
     {
         Toolbox::deprecated(
             message: "This method will be removed in the next version",
-            version: "11.1.0"
+            version: "12.0.0"
         );
         $unicity = new FieldUnicity();
         $unicity->showForm(1);

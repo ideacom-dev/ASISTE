@@ -35,6 +35,7 @@
 namespace Glpi\Api\HL;
 
 use CommonDBTM;
+use CommonGLPI;
 use Glpi\Api\HL\Controller\AbstractController;
 use Glpi\Api\HL\Doc as Doc;
 use Glpi\Api\HL\RSQL\RSQLException;
@@ -54,12 +55,25 @@ use function Safe\preg_match;
 final class ResourceAccessor
 {
     /**
+     * @param array $schema
+     * @return class-string<CommonGLPI>|null
+     */
+    private static function getItemtypeFromSchema(array $schema): ?string
+    {
+        if (isset($schema['x-itemtype'])) {
+            return $schema['x-itemtype'];
+        } elseif (isset($schema['x-table'])) {
+            return getItemTypeForTable($schema['x-table']);
+        }
+        return null;
+    }
+    /**
      * Get the related itemtype for the given schema.
      * @param array $schema
      */
     private static function getItemFromSchema(array $schema): CommonDBTM
     {
-        $itemtype = $schema['x-itemtype'] ?? ($schema['x-table'] ? getItemTypeForTable($schema['x-table']) : null);
+        $itemtype = self::getItemtypeFromSchema($schema);
         if ($itemtype === null) {
             throw new RuntimeException('Schema has no x-table or x-itemtype');
         }
@@ -142,6 +156,14 @@ final class ResourceAccessor
             } else {
                 $internal_name = $prop_name;
             }
+
+            // Modify the request params to support setting a dropdown value by its id as expected from the OpenAPI schema
+            foreach ($request_params as $key => $value) {
+                if (is_array($value) && array_key_exists('id', $value)) {
+                    $request_params[$key] = $value['id'];
+                }
+            }
+
             if (ArrayPathAccessor::hasElementByArrayPath($request_params, $prop_name)) {
                 $params[$internal_name] = ArrayPathAccessor::getElementByArrayPath($request_params, $prop_name);
             }
@@ -232,7 +254,7 @@ final class ResourceAccessor
      */
     public static function searchBySchema(array $schema, array $request_params): Response
     {
-        $itemtype = $schema['x-itemtype'] ?? null;
+        $itemtype = self::getItemtypeFromSchema($schema);
         // No item-level checks done here. They are handled when generating the SQL using the x-rights-condtions schema property
         if (($itemtype !== null) && !$itemtype::canView()) {
             return AbstractController::getAccessDeniedErrorResponse();
@@ -290,7 +312,7 @@ final class ResourceAccessor
      */
     public static function getOneBySchema(array $schema, array $request_attrs, array $request_params, string $field = 'id'): Response
     {
-        $itemtype = $schema['x-itemtype'] ?? null;
+        $itemtype = self::getItemtypeFromSchema($schema);
         // No item-level checks done here. They are handled when generating the SQL using the x-rights-condtions schema property
         if (($itemtype !== null) && !$itemtype::canView()) {
             return AbstractController::getAccessDeniedErrorResponse();

@@ -77,8 +77,14 @@ abstract class CommonDBConnexity extends CommonDBTM
     public const HAVE_VIEW_RIGHT_ON_ITEM = 2; // canXXXChild = true if parent::canView == true
     public const HAVE_SAME_RIGHT_ON_ITEM = 3; // canXXXChild = true if parent::canXXX == true
 
+    /** @var bool */
     public static $canDeleteOnItemClean          = true;
-    /// Disable auto forwarding information about entities ?
+
+    /**
+     * Disable auto forwarding information about entities?
+     *
+     * @var bool
+     */
     public static $disableAutoEntityForwarding   = false;
 
 
@@ -112,6 +118,7 @@ abstract class CommonDBConnexity extends CommonDBTM
      *
      * @param string  $itemtype  type of the item
      * @param integer $items_id  id of the item
+     * @return void
      **/
     public function cleanDBonItemDelete($itemtype, $items_id)
     {

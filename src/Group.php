@@ -619,7 +619,7 @@ class Group extends CommonTreeDropdown
                 $restrict[$itemtype]['is_deleted'] = 0;
             }
             $tot += $nb[$itemtype] = countElementsInTable($item::getTable(), [
-                'LEFT JOIN' => $joins[$itemtype] ?? [],
+                'LEFT JOIN' => $joins[$itemtype],
                 'WHERE'     => $restrict[$itemtype],
             ]);
         }
@@ -796,7 +796,6 @@ class Group extends CommonTreeDropdown
             ],
             'entries' => $entries,
             'total_number' => $nb,
-            'filtered_number' => $nb,
             'showmassiveactions' => self::canUpdate() && $show_massive_actions,
             'massiveactionparams' => [
                 'num_displayed' => count($entries),

@@ -207,6 +207,7 @@ class CommonDBTM extends CommonGLPI
      */
     public $right;
 
+    /** @var array<class-string, array> */
     private static $search_options_cache = [];
 
     /**
@@ -256,6 +257,9 @@ class CommonDBTM extends CommonGLPI
     }
 
 
+    /**
+     * @return string
+     */
     public static function getForeignKeyField()
     {
         $classname = static::class;
@@ -1638,7 +1642,7 @@ class CommonDBTM extends CommonGLPI
      **/
     public function update(array $input, $history = true, $options = [])
     {
-        global $DB, $GLPI_CACHE;
+        global $DB;
 
         if ($DB->isSlave()) {
             return false;
@@ -2404,6 +2408,8 @@ class CommonDBTM extends CommonGLPI
      * Unglobalize the item : duplicate item and connections.
      *
      * @see Asset_PeripheralAsset::unglobalizeItem()
+     * @return null
+     * @TODO Return a bool value (true on success, false on failure).
      */
     public function unglobalize()
     {
@@ -2556,6 +2562,9 @@ class CommonDBTM extends CommonGLPI
     }
 
 
+    /**
+     * @return bool
+     */
     public function canRecurs()
     {
 
@@ -3510,7 +3519,7 @@ class CommonDBTM extends CommonGLPI
 
         if ($this->isField('states_id') && $this->getType() != 'State') {
             $name = Dropdown::getDropdownName('glpi_states', $this->fields['states_id']);
-            if (strlen($name) > 0) {
+            if ($name !== '') {
                 $toadd[] = [
                     'name'  => __s('Status'),
                     'value' => htmlescape($name),
@@ -3520,7 +3529,7 @@ class CommonDBTM extends CommonGLPI
 
         if ($this->isField('locations_id') && $this->getType() != 'Location') {
             $name = Dropdown::getDropdownName("glpi_locations", $this->fields['locations_id']);
-            if (strlen($name) > 0) {
+            if ($name !== '') {
                 $toadd[] = [
                     'name'  => htmlescape(Location::getTypeName(1)),
                     'value' => htmlescape($name),
@@ -3530,7 +3539,7 @@ class CommonDBTM extends CommonGLPI
 
         if ($this->isField('users_id')) {
             $name = getUserName($this->fields['users_id']);
-            if (strlen($name) > 0) {
+            if ($name !== '') {
                 $toadd[] = [
                     'name'  => htmlescape(User::getTypeName(1)),
                     'value' => htmlescape($name),
@@ -3545,7 +3554,7 @@ class CommonDBTM extends CommonGLPI
             }
             foreach ($groups as $group) {
                 $name = Dropdown::getDropdownName("glpi_groups", $group);
-                if (strlen($name) > 0) {
+                if ((string) $name !== '') {
                     $toadd[] = [
                         'name'  => htmlescape(Group::getTypeName(1)),
                         'value' => htmlescape($name),
@@ -3556,7 +3565,7 @@ class CommonDBTM extends CommonGLPI
 
         if ($this->isField('users_id_tech')) {
             $name = getUserName($this->fields['users_id_tech']);
-            if (strlen($name) > 0) {
+            if ($name !== '') {
                 $toadd[] = [
                     'name'  => htmlescape(__('Technician in charge')),
                     'value' => htmlescape($name),
@@ -4391,6 +4400,9 @@ class CommonDBTM extends CommonGLPI
     }
 
 
+    /**
+     * @return array
+     */
     public function getUnallowedFieldsForUnicity()
     {
         return ['alert', 'comment', 'date_mod', 'id', 'is_recursive', 'items_id'];
@@ -5857,6 +5869,7 @@ class CommonDBTM extends CommonGLPI
         return $data;
     }
 
+    /** @return string */
     public static function getIcon()
     {
         // Generic icon that is not visible, but still takes up space to allow proper alignment in lists

@@ -48,6 +48,11 @@ class Printer_CartridgeInfo extends CommonDBChild
         return _n('Cartridge inventoried information', 'Cartridge inventoried information', $nb);
     }
 
+    /**
+     * @param Printer $printer
+     *
+     * @return array
+     */
     public function getInfoForPrinter(Printer $printer)
     {
         global $DB;
@@ -67,6 +72,11 @@ class Printer_CartridgeInfo extends CommonDBChild
         return $info;
     }
 
+    /**
+     * @param Printer $printer
+     *
+     * @return void
+     */
     public function showForPrinter(Printer $printer)
     {
         $info = $this->getInfoForPrinter($printer);
@@ -142,12 +152,14 @@ HTML;
                 ],
                 'entries' => $entries,
                 'total_number' => count($entries),
-                'filtered_number' => count($entries),
                 'showmassiveactions' => false,
             ]);
         }
     }
 
+    /**
+     * @return array
+     */
     public static function rawSearchOptionsToAdd()
     {
         $tab = [];

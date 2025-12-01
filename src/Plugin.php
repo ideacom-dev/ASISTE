@@ -182,6 +182,11 @@ class Plugin extends CommonDBTM
     private static $loaded_plugins = [];
 
     /**
+     * Indicates whether the plugins execution is forced.
+     */
+    private static bool $force_plugins_execution = false;
+
+    /**
      * Store additional infos for each plugins
      *
      * @var array
@@ -633,6 +638,51 @@ class Plugin extends CommonDBTM
         }
     }
 
+    /**
+     * Load all lang files for a plugin
+     *
+     * @param string $plugin_key System name (Plugin directory)
+     * @return void
+     */
+    public static function loadAllLang(string $plugin_key): void
+    {
+        $available_languages = self::getAvailableLanguages($plugin_key);
+
+        foreach ($available_languages as $language) {
+            self::loadLang($plugin_key, $language);
+        }
+    }
+
+    /**
+     * Return available langcode for a plugin
+     *
+     * @param string $plugin_key
+     * @return array
+     */
+    public static function getAvailableLanguages(string $plugin_key): array
+    {
+        $plugin_directory = self::getPhpDir($plugin_key);
+        $locales_dir = $plugin_directory . '/locales/';
+        if (!is_dir($locales_dir)) {
+            return [];
+        }
+
+        // Scan locale files and extract available language codes
+        $available_languages = [];
+        foreach (scandir($locales_dir) as $locale_file) {
+            if ($locale_file === '.' || $locale_file === '..') {
+                continue;
+            }
+
+            // Extract language code from files like fr_FR.mo, en_GB.mo, ...
+            if (preg_match('/^([a-z]{2}_[A-Z]{2})\.mo$/', $locale_file, $matches)) {
+                $language_code = $matches[1];
+                $available_languages[] = $language_code;
+            }
+        }
+
+        return $available_languages;
+    }
 
     /**
      * Check plugins states and detect new plugins.
@@ -738,6 +788,9 @@ class Plugin extends CommonDBTM
 
                 $this->filesystem_plugin_keys[] = $plugin_directory->getFilename();
             }
+
+            $this->filesystem_plugin_keys = array_unique($this->filesystem_plugin_keys);
+            asort($this->filesystem_plugin_keys);
         }
 
         return $this->filesystem_plugin_keys;
@@ -1153,6 +1206,38 @@ class Plugin extends CommonDBTM
             (new CacheManager())->getTranslationsCacheInstance()->clear();
 
             self::load($this->fields['directory'], true); // Load plugin hooks
+
+            $msg = '';
+
+            ob_start();
+            $can_install = $this->checkVersions($this->fields['directory']);
+            if (!$can_install) {
+                $msg .= ' <span class="error">' . htmlescape(ob_get_contents()) . "</span>";
+            }
+            ob_end_clean();
+
+            $check_function = 'plugin_' . $this->fields['directory'] . '_check_prerequisites';
+            if (function_exists($check_function)) {
+                ob_start();
+                $requirements_met = $check_function();
+                $msg = '';
+                if (!$requirements_met) {
+                    $can_install = false;
+                    $msg .= ' <span class="error">' . htmlescape(ob_get_contents()) . '</span>';
+                }
+                ob_end_clean();
+            }
+
+            if (!$can_install) {
+                $this->unload($this->fields['directory']);
+
+                Session::addMessageAfterRedirect(
+                    htmlescape(sprintf(__('Plugin %1$s prerequisites are not matching, it cannot be installed.'), $this->fields['name'])) . ' ' . $msg,
+                    true,
+                    ERROR
+                );
+                return;
+            }
 
             $install_function = 'plugin_' . $this->fields['directory'] . '_install';
             if (function_exists($install_function)) {
@@ -3280,6 +3365,10 @@ class Plugin extends CommonDBTM
     {
         global $CFG_GLPI;
 
+        if (self::$force_plugins_execution) {
+            return false;
+        }
+
         return in_array(
             $CFG_GLPI['plugins_execution_mode'] ?? null,
             [
@@ -3287,5 +3376,13 @@ class Plugin extends CommonDBTM
                 self::EXECUTION_MODE_SUSPENDED_MANUALLY,
             ]
         );
+    }
+
+    /**
+     * (un)force the plugins execution for the current PHP process.
+     */
+    public static function forcePluginsExecution(bool $force): void
+    {
+        self::$force_plugins_execution = $force;
     }
 }

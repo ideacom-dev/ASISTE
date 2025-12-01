@@ -43,6 +43,7 @@ use DbUtils;
 use Dropdown;
 use Glpi\Application\View\TemplateRenderer;
 use Glpi\DBAL\JsonFieldInterface;
+use Glpi\Form\Category;
 use Glpi\Form\Condition\ConditionHandler\ItemAsTextConditionHandler;
 use Glpi\Form\Condition\ConditionHandler\ItemConditionHandler;
 use Glpi\Form\Condition\ConditionValueTransformerInterface;
@@ -61,6 +62,7 @@ use PDU;
 use Session;
 use Software;
 use TicketRecurrent;
+use User;
 
 use function Safe\json_decode;
 use function Safe\json_encode;
@@ -132,8 +134,15 @@ class QuestionTypeItem extends AbstractQuestionType implements
             $selectable_tree_root = (bool) $values['selectable_tree_root'];
         }
 
+        // Map specific itemtypes
+        $itemtype = $rawData['itemtype'] ?? null;
+        $itemtype = match ($itemtype) {
+            "PluginFormcreatorCategory" => Category::class,
+            default                     => $itemtype,
+        };
+
         return (new QuestionTypeItemExtraDataConfig(
-            itemtype: $rawData['itemtype'] ?? null,
+            itemtype: $itemtype,
             root_items_id: $root_items_id,
             subtree_depth: $subtree_depth,
             selectable_tree_root: $selectable_tree_root
@@ -212,7 +221,20 @@ class QuestionTypeItem extends AbstractQuestionType implements
             return 0;
         }
 
-        return (int) $config->getItemsId();
+        $default_value = (int) $config->getItemsId();
+
+        // Fallback to 0 instead of -1 for the empty value as it is already used
+        // as the "Current logged-in user" special value.
+        $extra_config = $question->getExtraDataConfig();
+        if (!$extra_config instanceof QuestionTypeItemExtraDataConfig) {
+            throw new LogicException();
+        }
+
+        if ($extra_config->getItemtype() === User::class) {
+            $default_value = $default_value == -1 ? 0 : $default_value;
+        }
+
+        return $default_value;
     }
 
     #[Override]
@@ -336,16 +358,24 @@ class QuestionTypeItem extends AbstractQuestionType implements
     #[Override]
     public function renderEndUserTemplate(Question $question): string
     {
+        global $CFG_GLPI;
+
+        $itemtype = $this->getDefaultValueItemtype($question) ?? '0';
+        $is_itil_type = in_array($itemtype, $CFG_GLPI['itil_types']);
+        $id_already_visible = isset($_SESSION['glpiis_ids_visible']) && $_SESSION['glpiis_ids_visible'];
+
         $twig = TemplateRenderer::getInstance();
         return $twig->render(
             'pages/admin/form/question_type/item/end_user_template.html.twig',
             [
                 'question'                    => $question,
-                'itemtype'                    => $this->getDefaultValueItemtype($question) ?? '0',
+                'itemtype'                    => $itemtype,
                 'default_items_id'            => $this->getDefaultValueItemId($question),
                 'aria_label'                  => $question->fields['name'],
                 'sub_types'                   => $this->getSubTypes(),
                 'dropdown_restriction_params' => $this->getDropdownRestrictionParams($question),
+                'is_itil_type'                => $is_itil_type,
+                'id_already_visible'          => $id_already_visible,
             ]
         );
     }
