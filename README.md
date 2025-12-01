@@ -29,7 +29,7 @@ cp .env.example .env
 docker-compose up -d
 ```
 
-Accede a: `https://asiste.tudominio.com`
+Accede a: `https://asiste.ideacom.mx`
 
 **Credenciales por defecto:**
 - Usuario: `glpi`
