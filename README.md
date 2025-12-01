@@ -23,7 +23,7 @@ ASISTE es una solución integral de gestión de servicios TI y ticketing basada 
 ## Despliegue Rápido
 
 ```bash
-git clone https://github.com/tuusuario/asiste-glpi-docker.git
+git clone https://github.com/ideacom-dev/asiste-glpi-docker.git
 cd asiste-glpi-docker
 cp .env.example .env
 docker-compose up -d
